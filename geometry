@@ -1,0 +1,574 @@
+// Velo API Reference: https://www.wix.com/velo/reference/api-overview/introduction
+
+import wixWindow from 'wix-window-frontend';         // older sites: 'wix-window'
+import wixAnimations from 'wix-animations-frontend'; // older sites: 'wix-animations'
+import wixData from 'wix-data';
+
+// ============================================================
+// FILL THESE IN
+// ============================================================
+// The collection all 14 datasets read from. Find it in the CMS panel —
+// it's the collection ID, not the display name.
+const COLLECTION_ID = 'Geometry';
+
+// The field key each dataset is filtered on in the Editor. If your Editor
+// filter reads "Unit is 3", this is that field's key, and unitValue below
+// holds the values. Field keys are usually lowercase — check the CMS panel.
+const UNIT_FIELD = 'unit';
+
+// The tags field. Key, not display name — "Routines" is the name, this is the key.
+const TAGS_FIELD = 'arraystring';
+
+// The lesson title field, searched with contains().
+const TITLE_FIELD = 'title';
+
+// Every routine name, spelled exactly as it appears in the CMS — a mismatch
+// here means a dropdown option that returns nothing.
+//
+// This used to be read off the collection at load, which cost a full
+// .find() of every lesson just to harvest tag names. Hardcoding it drops
+// that request and means the search box matches routines from the first
+// keystroke instead of waiting on a query.
+//
+// The tradeoff: adding a routine to the CMS means adding it here too.
+// Dropdown order follows this array, so put them in the order you want.
+const ALL_ROUTINE_NAMES = [
+    '3 Act Math',
+    'Add Em Up',
+    'Art',
+    'Bucket of Lies',
+    'Card Sort',
+    'Chromebooks',
+    'Concept Quiz',
+    'Constructions',
+    'Error Analysis',
+    'Free Chance',
+    'Game',
+    'No Lesson Yet',
+    'Partner A & B',
+    'Quiz Analysis',
+    'Spiraling',
+    'Unpack Quiz'
+];
+
+// ============================================================
+// CONFIG — one row per unit. Add/remove units here only.
+//   button    : header button that toggles the unit
+//   hoverBar  : box that turns yellow on hover and rotates on open
+//   anchor    : box holding the whole unit (header + panels)
+//   panels    : boxes that collapse/expand together for this unit
+//   dataset   : the unit's dataset
+//   unitValue : this unit's value in UNIT_FIELD
+//   repeater  : the unit's lesson repeater
+//   rowBox    : container inside one repeater row, colored by routine
+//   rowText   : text inside rowBox, colored by routine
+// ============================================================
+const UNITS = [
+    { button: '#button7',  hoverBar: '#box169', anchor: '#box164', panels: ['#box172', '#box181'], dataset: '#dataset1',  unitValue: 1,  repeater: '#repeater1',  rowBox: '#box178', rowText: '#text101' },
+    { button: '#button11', hoverBar: '#box199', anchor: '#box206', panels: ['#box198', '#box193'], dataset: '#dataset2',  unitValue: 2,  repeater: '#repeater3',  rowBox: '#box188', rowText: '#text106' },
+    { button: '#button14', hoverBar: '#box219', anchor: '#box226', panels: ['#box218', '#box213'], dataset: '#dataset3',  unitValue: 3,  repeater: '#repeater4',  rowBox: '#box208', rowText: '#text116' },
+    { button: '#button17', hoverBar: '#box238', anchor: '#box245', panels: ['#box237', '#box232'], dataset: '#dataset4',  unitValue: 4,  repeater: '#repeater5',  rowBox: '#box227', rowText: '#text126' },
+    { button: '#button20', hoverBar: '#box257', anchor: '#box264', panels: ['#box256', '#box251'], dataset: '#dataset5',  unitValue: 5,  repeater: '#repeater6',  rowBox: '#box246', rowText: '#text136' },
+    { button: '#button23', hoverBar: '#box276', anchor: '#box283', panels: ['#box275', '#box270'], dataset: '#dataset6',  unitValue: 6,  repeater: '#repeater7',  rowBox: '#box265', rowText: '#text146' },
+    { button: '#button26', hoverBar: '#box295', anchor: '#box302', panels: ['#box294', '#box289'], dataset: '#dataset7',  unitValue: 7,  repeater: '#repeater8',  rowBox: '#box284', rowText: '#text156' },
+    { button: '#button29', hoverBar: '#box314', anchor: '#box321', panels: ['#box313', '#box308'], dataset: '#dataset8',  unitValue: 8,  repeater: '#repeater9',  rowBox: '#box303', rowText: '#text166' },
+    { button: '#button32', hoverBar: '#box333', anchor: '#box340', panels: ['#box332', '#box327'], dataset: '#dataset9',  unitValue: 9,  repeater: '#repeater10', rowBox: '#box322', rowText: '#text176' },
+    { button: '#button35', hoverBar: '#box352', anchor: '#box359', panels: ['#box351', '#box346'], dataset: '#dataset10', unitValue: 10, repeater: '#repeater11', rowBox: '#box341', rowText: '#text186' },
+    { button: '#button38', hoverBar: '#box371', anchor: '#box378', panels: ['#box370', '#box365'], dataset: '#dataset11', unitValue: 11, repeater: '#repeater12', rowBox: '#box360', rowText: '#text196' },
+    { button: '#button41', hoverBar: '#box390', anchor: '#box397', panels: ['#box389', '#box384'], dataset: '#dataset12', unitValue: 12, repeater: '#repeater13', rowBox: '#box379', rowText: '#text206' },
+    { button: '#button44', hoverBar: '#box409', anchor: '#box416', panels: ['#box408', '#box403'], dataset: '#dataset13', unitValue: 13, repeater: '#repeater14', rowBox: '#box398', rowText: '#text216' },
+    { button: '#button47', hoverBar: '#box428', anchor: '#box435', panels: ['#box422'],            dataset: '#dataset14', unitValue: 14, repeater: '#repeater15', rowBox: '#box417', rowText: '#text226' }
+];
+
+const TOGGLE_ALL_BUTTON = '#button6';
+const ROUTINE_DROPDOWN  = '#dropdown1';
+const SEARCH_INPUT      = '#input1';
+const REPEATER          = '#repeater2';
+const REPEATER_BUTTON   = '#button10';
+const REPEATER_BOX      = '#box183';
+
+const ALL_ROUTINES = 'ALL';
+
+const ACTIVE_COLOR = '#FBC211'; // selected yellow
+const HOVER_COLOR  = '#F3F2E1'; // hover cream
+const IDLE_COLOR   = '#FFFFFF';
+
+// ============================================================
+// ROUTINE ROW STYLES
+// Keys are lowercased so a stray capital or trailing space in the CMS still
+// matches. "3 Act Math" and "Concept Quiz" don't co-occur — if one ever did
+// slip through, the row takes whichever of the two the item lists first.
+// ============================================================
+const ROUTINE_STYLES = {
+    '3 act math':   { box: '#FBC211', text: '#000000' },
+    'concept quiz': { box: '#000000', text: '#FFFFFF' }
+};
+
+const DEFAULT_ROW_STYLE = { box: '#F3F2E1', text: '#000000' };
+
+const ROTATE_DURATION = 300;
+const ROTATE_EASING   = 'easeInOutSine';
+
+// How long typing has to pause before a search runs. Each search costs one
+// distinct() query plus a setFilter per matching unit, so firing on every
+// keystroke would queue up a lot of work that's obsolete before it lands.
+const SEARCH_DEBOUNCE = 300;
+
+// Height of the sticky filter/search bar, in px. The bar paints over the top
+// of the viewport, so a raw anchor jump parks the unit heading underneath it.
+const STICKY_OFFSET = 120;
+
+// One timeline per unit, built once in setupRotations() and stored on the
+// unit as `rotation`. play() drives it to 180 degrees, reverse() drives it
+// back to 0. Both are no-ops if the timeline is already at that end, so
+// repeat calls can't desync the arrow from the panel.
+
+// Single source of truth for the highlighted repeater row.
+// Never read colors back out of the DOM — Velo can hand them back in a
+// different format (rgb()) than the one you wrote in (#hex).
+let activeIndex = -1;
+
+// ============================================================
+// PAGE SETUP
+// ============================================================
+$w.onReady(function () {
+    setupRotations();
+    setupHeaderButtons();
+    setupRepeater();
+    setupLessonRows();
+    setupScrollSpy();
+
+    $w(TOGGLE_ALL_BUTTON).onClick(toggleAll);
+    refreshToggleAllLabel();
+
+    setupSearch();
+    setupRoutineFilter();
+});
+
+// ============================================================
+// HEADER BUTTONS (hover + click)
+// ============================================================
+function setupHeaderButtons() {
+    UNITS.forEach((unit, index) => {
+        $w(unit.button).onMouseIn(() => {
+            $w(unit.hoverBar).style.backgroundColor = ACTIVE_COLOR;
+            $w(unit.anchor).style.backgroundColor = HOVER_COLOR;
+        });
+
+        $w(unit.button).onMouseOut(() => {
+            $w(unit.hoverBar).style.backgroundColor = IDLE_COLOR;
+            $w(unit.anchor).style.backgroundColor = IDLE_COLOR;
+        });
+
+        $w(unit.button).onClick(() => toggleUnit(index));
+    });
+}
+
+// ============================================================
+// LESSON ROW STYLING
+// Not a one-shot pass. setFilter() makes a repeater re-render, and Wix
+// recycles row elements — the box that was black with white text can be
+// handed a different lesson next time. onItemReady fires again on every
+// re-render, so styling from there keeps rows correct after a search or a
+// routine change, provided every branch below sets an explicit state
+// rather than leaving the previous one in place.
+// ============================================================
+function setupLessonRows() {
+    UNITS.forEach(unit => {
+        const styleRow = ($item, itemData) => styleLessonRow($item, itemData, unit);
+
+        $w(unit.repeater).onItemReady(styleRow);
+
+        // Rows that rendered before this ran. Safe to double up here in a way
+        // the side-nav wiring isn't — this only writes styles, it doesn't
+        // attach handlers, so running twice just paints the same colors.
+        if ($w(unit.repeater).data && $w(unit.repeater).data.length > 0) {
+            $w(unit.repeater).forEachItem(styleRow);
+        }
+    });
+}
+
+function styleLessonRow($item, itemData, unit) {
+    const raw = itemData && itemData[TAGS_FIELD];
+    const tags = (Array.isArray(raw) ? raw : [])
+        .filter(Boolean)
+        .map(tag => String(tag).trim().toLowerCase());
+
+    // hide() rather than collapse() — the row keeps its footprint so the
+    // spacing down the unit doesn't shift. The text is inside the box, so
+    // hiding the box takes it along.
+    if (tags.length === 0) {
+        return $item(unit.rowBox).hide();
+    }
+
+    const style = tags.reduce((found, tag) => found || ROUTINE_STYLES[tag], null)
+        || DEFAULT_ROW_STYLE;
+
+    $item(unit.rowBox).style.backgroundColor = style.box;
+    $item(unit.rowText).style.color = style.text;
+
+    // Always show, never "leave it" — this element may have been hidden on
+    // its last trip through here with a different lesson's data.
+    return $item(unit.rowBox).show();
+}
+
+// ============================================================
+// REPEATER (side nav)
+// ============================================================
+function setupRepeater() {
+    const wiredRows = new Set();
+
+    const wireRow = ($item, itemData, index) => {
+        // Guard against double-binding if onItemReady fires for rows we've
+        // already handled. Two handlers on one button = the click fires twice.
+        const key = (itemData && itemData._id) || index;
+        if (wiredRows.has(key)) { return; }
+        wiredRows.add(key);
+
+        $item(REPEATER_BUTTON).onMouseIn(() => {
+            if (index !== activeIndex) {
+                $item(REPEATER_BOX).style.backgroundColor = HOVER_COLOR;
+            }
+        });
+
+        $item(REPEATER_BUTTON).onMouseOut(() => {
+            if (index !== activeIndex) {
+                $item(REPEATER_BOX).style.backgroundColor = IDLE_COLOR;
+            }
+        });
+
+        $item(REPEATER_BUTTON).onClick(() => {
+            selectRepeaterItem(index);
+            // Expand first so the anchor is in its final resting place before
+            // we measure — expanding after the scroll shifts the target.
+            expandUnit(index).then(() => scrollToUnit(index));
+        });
+    };
+
+    // Rows that render from here on.
+    $w(REPEATER).onItemReady(wireRow);
+
+    // Rows that rendered before we got here. The Set guard above makes this
+    // safe to run alongside onItemReady — whichever fires second is a no-op.
+    if ($w(REPEATER).data && $w(REPEATER).data.length > 0) {
+        $w(REPEATER).forEachItem(wireRow);
+    }
+}
+
+function selectRepeaterItem(targetIndex) {
+    if (targetIndex === activeIndex) { return; } // scroll fires this a lot
+    activeIndex = targetIndex;
+
+    $w(REPEATER).forEachItem(($item, itemData, index) => {
+        $item(REPEATER_BOX).style.backgroundColor =
+            index === targetIndex ? ACTIVE_COLOR : IDLE_COLOR;
+    });
+}
+
+// Collapsing the row's box shrinks the row to nothing, which hides it from
+// the list without touching the repeater's data. Rewriting .data would
+// renumber every remaining row, and this code maps row index straight to
+// UNITS[index] — so the nav would start opening the wrong units.
+// Takes the whole visibility array so the repeater is walked once, not once
+// per unit.
+function setRowVisibility(visibleFlags) {
+    $w(REPEATER).forEachItem(($item, itemData, index) => {
+        visibleFlags[index]
+            ? $item(REPEATER_BOX).expand()
+            : $item(REPEATER_BOX).collapse();
+    });
+}
+
+function setupScrollSpy() {
+    UNITS.forEach((unit, index) => {
+        $w(unit.anchor).onViewportEnter(() => selectRepeaterItem(index));
+    });
+}
+
+// Velo can't offset an anchor jump directly, so: land on the anchor, ask the
+// window where that put us, then back off by the height of the sticky bar.
+function scrollToUnit(index) {
+    return $w(UNITS[index].anchor).scrollTo()
+        .then(() => wixWindow.getBoundingRect())
+        .then(rect => {
+            const y = Math.max(0, rect.scroll.y - STICKY_OFFSET);
+            return wixWindow.scrollTo(rect.scroll.x, y, { scrollAnimation: false });
+        });
+}
+
+// ============================================================
+// FILTER STATE
+// The dropdown and the search box are two halves of one filter, ANDed
+// together. Both write to the state below and then call applyFilters(),
+// which is the only thing that touches datasets.
+// ============================================================
+let currentRoutine = ALL_ROUTINES;
+let currentSearch  = '';
+
+// Which datasets currently carry a filter beyond their unit condition. Only
+// these need resetting when both controls go back to empty — untouched
+// datasets are already showing everything.
+const filteredDatasets = new Set();
+
+// Last-write-wins guard, shared by both controls. If someone types again or
+// changes the dropdown while a slower query is still in flight, the stale
+// result is dropped instead of stomping the newer selection.
+let filterToken = 0;
+
+function setupRoutineFilter() {
+    $w(ROUTINE_DROPDOWN).onChange(() => {
+        currentRoutine = $w(ROUTINE_DROPDOWN).value || ALL_ROUTINES;
+        applyFilters();
+    });
+    fillRoutineOptions();
+}
+
+// No query — the options come straight off ALL_ROUTINE_NAMES, so the
+// dropdown is usable the moment the page is ready.
+function fillRoutineOptions() {
+    const options = [{ label: 'All routines', value: ALL_ROUTINES }];
+
+    ALL_ROUTINE_NAMES.forEach(routine => {
+        options.push({ label: routine, value: routine });
+    });
+
+    $w(ROUTINE_DROPDOWN).options = options;
+    $w(ROUTINE_DROPDOWN).value = ALL_ROUTINES;
+}
+
+// ============================================================
+// SEARCH BOX
+// ============================================================
+let searchTimer;
+
+function setupSearch() {
+    $w(SEARCH_INPUT).onInput(() => {
+        const typed = ($w(SEARCH_INPUT).value || '').trim();
+
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            // Typing and deleting back to the same term shouldn't re-query.
+            if (typed === currentSearch) { return; }
+            currentSearch = typed;
+            applyFilters();
+        }, SEARCH_DEBOUNCE);
+    });
+}
+
+// contains() can't do a partial match inside an array field, so the routine
+// half of the search is resolved here instead: find the routine names that
+// contain the term, then hasSome() those exact values. Practical upshot —
+// typing "warm" pulls in everything tagged "Warm Up", not just titles with
+// "warm" in them.
+function routinesMatching(term) {
+    const needle = term.toLowerCase();
+    return ALL_ROUTINE_NAMES.filter(routine => routine.toLowerCase().includes(needle));
+}
+
+// ============================================================
+// FILTER BUILDERS
+// setFilter() REPLACES a dataset's filter, Editor filter included — so the
+// unit condition has to be rebuilt here every time, alongside whatever the
+// two controls currently hold.
+// ============================================================
+function searchFilter() {
+    const titleHit = wixData.filter().contains(TITLE_FIELD, currentSearch);
+    const routineHits = routinesMatching(currentSearch);
+
+    return routineHits.length > 0
+        ? titleHit.or(wixData.filter().hasSome(TAGS_FIELD, routineHits))
+        : titleHit;
+}
+
+function unitFilter(unit) {
+    let filter = wixData.filter().eq(UNIT_FIELD, unit.unitValue);
+
+    if (currentRoutine !== ALL_ROUTINES) {
+        filter = filter.hasSome(TAGS_FIELD, [currentRoutine]);
+    }
+
+    // The search is an OR internally (title or routine), so it has to be
+    // built as its own filter and ANDed on — chaining .or() onto the filter
+    // above would OR the unit condition away too.
+    if (currentSearch) {
+        filter = filter.and(searchFilter());
+    }
+
+    return filter;
+}
+
+// Same conditions as unitFilter(), minus the unit — asked as a query so
+// distinct() can answer "which units survive this?" in one request.
+function matchQuery() {
+    let query = wixData.query(COLLECTION_ID);
+
+    if (currentRoutine !== ALL_ROUTINES) {
+        query = query.hasSome(TAGS_FIELD, [currentRoutine]);
+    }
+
+    if (currentSearch) {
+        const routineHits = routinesMatching(currentSearch);
+        let sub = wixData.query(COLLECTION_ID).contains(TITLE_FIELD, currentSearch);
+
+        if (routineHits.length > 0) {
+            sub = sub.or(wixData.query(COLLECTION_ID).hasSome(TAGS_FIELD, routineHits));
+        }
+
+        query = query.and(sub);
+    }
+
+    return query;
+}
+
+// ============================================================
+// APPLYING THE FILTERS
+// ============================================================
+function applyFilters() {
+    const token = ++filterToken;
+    const noFilters = currentRoutine === ALL_ROUTINES && currentSearch === '';
+    return noFilters ? resetAllUnits(token) : filterUnits(token);
+}
+
+// One small query answers "which units survive?" — distinct() returns just
+// the unit values, not the records. Only the units that actually matched
+// then need a setFilter; the rest are hidden without a request.
+function filterUnits(token) {
+    return matchQuery()
+        .distinct(UNIT_FIELD)
+        .then(results => {
+            if (token !== filterToken) { return; } // superseded by a newer pick
+
+            const matchedValues = new Set(results.items);
+            const matched = UNITS.map(unit => matchedValues.has(unit.unitValue));
+
+            setRowVisibility(matched);
+
+            return Promise.all(UNITS.map((unit, index) => {
+                if (!matched[index]) {
+                    // Close before hiding so the arrow isn't stuck at 180
+                    // degrees when the unit comes back.
+                    return setUnitExpanded(unit, false)
+                        .then(() => $w(unit.anchor).collapse());
+                }
+
+                filteredDatasets.add(index);
+
+                return $w(unit.dataset).setFilter(unitFilter(unit))
+                    .then(() => $w(unit.anchor).expand())
+                    .then(() => setUnitExpanded(unit, true));
+            }));
+        })
+        .then(() => {
+            if (token === filterToken) { refreshToggleAllLabel(); }
+        })
+        .catch(error => {
+            console.error('Could not apply filters:', error);
+        });
+}
+
+// Reached only when both controls are empty, so unitFilter() here rebuilds
+// the bare unit condition.
+function resetAllUnits(token) {
+    const pending = Array.from(filteredDatasets).map(index =>
+        $w(UNITS[index].dataset).setFilter(unitFilter(UNITS[index]))
+    );
+    filteredDatasets.clear();
+
+    setRowVisibility(UNITS.map(() => true));
+
+    return Promise.all(pending)
+        .then(() => {
+            if (token !== filterToken) { return; }
+            // Everything back on screen, everything closed.
+            return Promise.all(UNITS.map(unit =>
+                $w(unit.anchor).expand().then(() => setUnitExpanded(unit, false))
+            ));
+        })
+        .then(() => {
+            if (token === filterToken) { refreshToggleAllLabel(); }
+        })
+        .catch(error => {
+            console.error('Could not reset filters:', error);
+        });
+}
+
+// ============================================================
+// ARROW ROTATION
+// Remove the click interaction from the Editor first — if it stays, the
+// Editor animation and this one both fire and cancel each other out.
+// ============================================================
+function setupRotations() {
+    UNITS.forEach(unit => {
+        unit.rotation = wixAnimations.timeline().add($w(unit.hoverBar), {
+            rotate: 180,
+            duration: ROTATE_DURATION,
+            easing: ROTATE_EASING
+        });
+
+        // A unit left expanded in the Editor starts with its arrow at 0.
+        if (isUnitExpanded(unit)) {
+            unit.rotation.play();
+        }
+    });
+}
+
+// ============================================================
+// COLLAPSE / EXPAND
+// ============================================================
+function isUnitExpanded(unit) {
+    return !$w(unit.panels[0]).collapsed;
+}
+
+function isUnitVisible(unit) {
+    return !$w(unit.anchor).collapsed;
+}
+
+// Sets an explicit state instead of toggling, so the panels inside a unit
+// can never drift out of sync with each other. Every path that opens or
+// closes a unit — header button, repeater button, expand all, routine
+// filter, search — comes through here, so this is the one place the arrow
+// needs to be kept in step.
+function setUnitExpanded(unit, shouldExpand) {
+    if (unit.rotation) {
+        shouldExpand ? unit.rotation.play() : unit.rotation.reverse();
+    }
+
+    return Promise.all(
+        unit.panels.map(selector =>
+            shouldExpand ? $w(selector).expand() : $w(selector).collapse()
+        )
+    );
+}
+
+function toggleUnit(index) {
+    const unit = UNITS[index];
+    return setUnitExpanded(unit, !isUnitExpanded(unit)).then(refreshToggleAllLabel);
+}
+
+function expandUnit(index) {
+    const unit = UNITS[index];
+    if (isUnitExpanded(unit)) { return Promise.resolve(); }
+    return setUnitExpanded(unit, true).then(refreshToggleAllLabel);
+}
+
+// Decide one target state for every visible unit up front, then force them
+// all into it. Toggling each unit individually just inverts a mixed state
+// instead of expanding everything. Units hidden by the filters are left alone.
+function toggleAll() {
+    const units = UNITS.filter(isUnitVisible);
+    if (units.length === 0) { return Promise.resolve(); }
+
+    const shouldExpand = !units.every(isUnitExpanded);
+
+    // Label reflects the state we're moving to — don't re-read .collapsed
+    // here, since expand()/collapse() are async.
+    $w(TOGGLE_ALL_BUTTON).label = shouldExpand ? 'Collapse all' : 'Expand all';
+
+    return Promise.all(units.map(unit => setUnitExpanded(unit, shouldExpand)));
+}
+
+function refreshToggleAllLabel() {
+    const units = UNITS.filter(isUnitVisible);
+    const allOpen = units.length > 0 && units.every(isUnitExpanded);
+    $w(TOGGLE_ALL_BUTTON).label = allOpen ? 'Collapse all' : 'Expand all';
+}
