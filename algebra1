@@ -7,31 +7,33 @@ import wixData from 'wix-data';
 // ============================================================
 // FILL THESE IN
 // ============================================================
-// The collection all 14 datasets read from. Find it in the CMS panel —
+// The collection every lesson lives in. Find it in the CMS panel —
 // it's the collection ID, not the display name.
 const COLLECTION_ID = 'Algebra1Curriculum';
 
-// The field key each dataset is filtered on in the Editor. If your Editor
-// filter reads "Unit is 3", this is that field's key, and unitValue below
-// holds the values. Field keys are usually lowercase — check the CMS panel.
-const UNIT_FIELD = 'unit';
+// Field keys (not display names). Usually lowercase — check the CMS panel.
+const UNIT_FIELD   = 'unit';         // holds the unit number, 1-14
+const TAGS_FIELD   = 'arraystring';  // the routines tags
+const TITLE_FIELD  = 'title';
+const NUMBER_FIELD = 'lessonNumber';
 
-// The tags field. Key, not display name — "Routines" is the name, this is the key.
-const TAGS_FIELD = 'arraystring';
+// Lessons are shown in this order inside each unit. This is assumed to match
+// the sort the old datasets used — change it if they sorted by something else.
+const SORT_FIELD = NUMBER_FIELD;
 
-// The lesson title field, searched with contains().
-const TITLE_FIELD = 'title';
+// The field holding each lesson's link to the "Algebra 1 (item)" page. Query
+// results carry it as link-<collection>-<field>, e.g. link-Algebra1Curriculum-title.
+// Leave blank and it's found automatically; fill it in only if the page has
+// more than one dynamic page and the wrong link gets picked.
+const LINK_FIELD = '';
+
+// How the routine tags read in the row's routine text, e.g. "Card Sort, Game".
+const ROUTINE_JOINER = ', ';
 
 // Every routine name, spelled exactly as it appears in the CMS — a mismatch
-// here means a dropdown option that returns nothing.
-//
-// This used to be read off the collection at load, which cost a full
-// .find() of every lesson just to harvest tag names. Hardcoding it drops
-// that request and means the search box matches routines from the first
-// keystroke instead of waiting on a query.
-//
-// The tradeoff: adding a routine to the CMS means adding it here too.
-// Dropdown order follows this array, so put them in the order you want.
+// here means a dropdown option that returns nothing. Dropdown order follows
+// this array. Only the dropdown reads it now; search checks the lessons' own
+// tags, so a routine added to the CMS is searchable without touching this.
 const ALL_ROUTINE_NAMES = [
     '3 Act Math',
     'Add Em Up',
@@ -53,27 +55,29 @@ const ALL_ROUTINE_NAMES = [
 //   hoverBar  : box that turns yellow on hover and rotates on open
 //   anchor    : box holding the whole unit (header + panels)
 //   panels    : boxes that collapse/expand together for this unit
-//   dataset   : the unit's dataset
 //   unitValue : this unit's value in UNIT_FIELD
-//   repeater  : the unit's lesson repeater
+//   repeater  : the unit's lesson repeater (filled from code, no dataset)
 //   rowBox    : container inside one repeater row, colored by routine
-//   rowText   : text inside rowBox, colored by routine
+//   rowNumber : lesson number text inside the row
+//   rowTitle  : lesson title text inside the row
+//   rowText   : routines text inside rowBox, colored by routine
+//   rowButton : button linking to the lesson's page
 // ============================================================
 const UNITS = [
-    { button: '#button7',  hoverBar: '#box169', anchor: '#box164', panels: ['#box172', '#box181'], dataset: '#dataset1',  unitValue: 1,  repeater: '#repeater1',  rowBox: '#box178', rowText: '#text101' },
-    { button: '#button11', hoverBar: '#box199', anchor: '#box206', panels: ['#box198', '#box193'], dataset: '#dataset2',  unitValue: 2,  repeater: '#repeater3',  rowBox: '#box188', rowText: '#text106' },
-    { button: '#button14', hoverBar: '#box219', anchor: '#box226', panels: ['#box218', '#box213'], dataset: '#dataset3',  unitValue: 3,  repeater: '#repeater4',  rowBox: '#box208', rowText: '#text116' },
-    { button: '#button17', hoverBar: '#box238', anchor: '#box245', panels: ['#box237', '#box232'], dataset: '#dataset4',  unitValue: 4,  repeater: '#repeater5',  rowBox: '#box227', rowText: '#text126' },
-    { button: '#button20', hoverBar: '#box257', anchor: '#box264', panels: ['#box256', '#box251'], dataset: '#dataset5',  unitValue: 5,  repeater: '#repeater6',  rowBox: '#box246', rowText: '#text136' },
-    { button: '#button23', hoverBar: '#box276', anchor: '#box283', panels: ['#box275', '#box270'], dataset: '#dataset6',  unitValue: 6,  repeater: '#repeater7',  rowBox: '#box265', rowText: '#text146' },
-    { button: '#button26', hoverBar: '#box295', anchor: '#box302', panels: ['#box294', '#box289'], dataset: '#dataset7',  unitValue: 7,  repeater: '#repeater8',  rowBox: '#box284', rowText: '#text156' },
-    { button: '#button29', hoverBar: '#box314', anchor: '#box321', panels: ['#box313', '#box308'], dataset: '#dataset8',  unitValue: 8,  repeater: '#repeater9',  rowBox: '#box303', rowText: '#text166' },
-    { button: '#button32', hoverBar: '#box333', anchor: '#box340', panels: ['#box332', '#box327'], dataset: '#dataset9',  unitValue: 9,  repeater: '#repeater10', rowBox: '#box322', rowText: '#text176' },
-    { button: '#button35', hoverBar: '#box352', anchor: '#box359', panels: ['#box351', '#box346'], dataset: '#dataset10', unitValue: 10, repeater: '#repeater11', rowBox: '#box341', rowText: '#text186' },
-    { button: '#button38', hoverBar: '#box371', anchor: '#box378', panels: ['#box370', '#box365'], dataset: '#dataset11', unitValue: 11, repeater: '#repeater12', rowBox: '#box360', rowText: '#text196' },
-    { button: '#button41', hoverBar: '#box390', anchor: '#box397', panels: ['#box389', '#box384'], dataset: '#dataset12', unitValue: 12, repeater: '#repeater13', rowBox: '#box379', rowText: '#text206' },
-    { button: '#button44', hoverBar: '#box409', anchor: '#box416', panels: ['#box403'],            dataset: '#dataset13', unitValue: 13, repeater: '#repeater14', rowBox: '#box398', rowText: '#text216' },
-    { button: '#button47', hoverBar: '#box428', anchor: '#box435', panels: ['#box422'],            dataset: '#dataset14', unitValue: 14, repeater: '#repeater15', rowBox: '#box417', rowText: '#text226' }
+    { button: '#button7',  hoverBar: '#box169', anchor: '#box164', panels: ['#box172', '#box181'], unitValue: 1,  repeater: '#repeater1',  rowBox: '#box178', rowNumber: '#text99',  rowTitle: '#text100', rowText: '#text101', rowButton: '#button9'  },
+    { button: '#button11', hoverBar: '#box199', anchor: '#box206', panels: ['#box198', '#box193'], unitValue: 2,  repeater: '#repeater3',  rowBox: '#box188', rowNumber: '#text108', rowTitle: '#text107', rowText: '#text106', rowButton: '#button12' },
+    { button: '#button14', hoverBar: '#box219', anchor: '#box226', panels: ['#box218', '#box213'], unitValue: 3,  repeater: '#repeater4',  rowBox: '#box208', rowNumber: '#text118', rowTitle: '#text117', rowText: '#text116', rowButton: '#button15' },
+    { button: '#button17', hoverBar: '#box238', anchor: '#box245', panels: ['#box237', '#box232'], unitValue: 4,  repeater: '#repeater5',  rowBox: '#box227', rowNumber: '#text128', rowTitle: '#text127', rowText: '#text126', rowButton: '#button18' },
+    { button: '#button20', hoverBar: '#box257', anchor: '#box264', panels: ['#box256', '#box251'], unitValue: 5,  repeater: '#repeater6',  rowBox: '#box246', rowNumber: '#text138', rowTitle: '#text137', rowText: '#text136', rowButton: '#button21' },
+    { button: '#button23', hoverBar: '#box276', anchor: '#box283', panels: ['#box275', '#box270'], unitValue: 6,  repeater: '#repeater7',  rowBox: '#box265', rowNumber: '#text148', rowTitle: '#text147', rowText: '#text146', rowButton: '#button24' },
+    { button: '#button26', hoverBar: '#box295', anchor: '#box302', panels: ['#box294', '#box289'], unitValue: 7,  repeater: '#repeater8',  rowBox: '#box284', rowNumber: '#text158', rowTitle: '#text157', rowText: '#text156', rowButton: '#button27' },
+    { button: '#button29', hoverBar: '#box314', anchor: '#box321', panels: ['#box313', '#box308'], unitValue: 8,  repeater: '#repeater9',  rowBox: '#box303', rowNumber: '#text168', rowTitle: '#text167', rowText: '#text166', rowButton: '#button30' },
+    { button: '#button32', hoverBar: '#box333', anchor: '#box340', panels: ['#box332', '#box327'], unitValue: 9,  repeater: '#repeater10', rowBox: '#box322', rowNumber: '#text178', rowTitle: '#text177', rowText: '#text176', rowButton: '#button33' },
+    { button: '#button35', hoverBar: '#box352', anchor: '#box359', panels: ['#box351', '#box346'], unitValue: 10, repeater: '#repeater11', rowBox: '#box341', rowNumber: '#text188', rowTitle: '#text187', rowText: '#text186', rowButton: '#button36' },
+    { button: '#button38', hoverBar: '#box371', anchor: '#box378', panels: ['#box370', '#box365'], unitValue: 11, repeater: '#repeater12', rowBox: '#box360', rowNumber: '#text198', rowTitle: '#text197', rowText: '#text196', rowButton: '#button39' },
+    { button: '#button41', hoverBar: '#box390', anchor: '#box397', panels: ['#box389', '#box384'], unitValue: 12, repeater: '#repeater13', rowBox: '#box379', rowNumber: '#text208', rowTitle: '#text207', rowText: '#text206', rowButton: '#button42' },
+    { button: '#button44', hoverBar: '#box409', anchor: '#box416', panels: ['#box403'],            unitValue: 13, repeater: '#repeater14', rowBox: '#box398', rowNumber: '#text218', rowTitle: '#text217', rowText: '#text216', rowButton: '#button45' },
+    { button: '#button47', hoverBar: '#box428', anchor: '#box435', panels: ['#box422'],            unitValue: 14, repeater: '#repeater15', rowBox: '#box417', rowNumber: '#text228', rowTitle: '#text227', rowText: '#text226', rowButton: '#button48' }
 ];
 
 const TOGGLE_ALL_BUTTON = '#button6';
@@ -105,10 +109,10 @@ const DEFAULT_ROW_STYLE = { box: '#F3F2E1', text: '#000000' };
 const ROTATE_DURATION = 300;
 const ROTATE_EASING   = 'easeInOutSine';
 
-// How long typing has to pause before a search runs. Each search costs one
-// distinct() query plus a setFilter per matching unit, so firing on every
-// keystroke would queue up a lot of work that's obsolete before it lands.
-const SEARCH_DEBOUNCE = 300;
+// How long typing has to pause before a search runs. Searching is all in the
+// browser now, so this only keeps the page from re-rendering every unit on
+// every keystroke.
+const SEARCH_DEBOUNCE = 150;
 
 // Height of the sticky filter/search bar, in px. The bar paints over the top
 // of the viewport, so a raw anchor jump parks the unit heading underneath it.
@@ -125,6 +129,136 @@ const STICKY_OFFSET = 120;
 let activeIndex = -1;
 
 // ============================================================
+// LESSON DATA
+// One request fetches every lesson, once. Nothing else on the page talks to
+// the database: the unit repeaters are filled from this list, and the search
+// box and routine dropdown filter it in the browser.
+//
+// A unit's repeater is only filled when the unit is opened, so the page loads
+// without rendering a single lesson row. Each unit remembers which filter its
+// rows were built for (`renderedFor`); when a collapsed unit is opened after
+// the filters changed, it rebuilds itself first.
+// ============================================================
+let lessonsByUnit = new Map();
+let lessonsLoaded = false;
+let lessonsPromise = null;
+let linkFieldName = '';
+
+// wix-data returns at most 1,000 items a page, so page through if the
+// collection ever grows past that.
+async function fetchAllLessons() {
+    let results = await wixData.query(COLLECTION_ID)
+        .ascending(SORT_FIELD)
+        .limit(1000)
+        .find();
+
+    const items = results.items.slice();
+
+    while (results.hasNext()) {
+        results = await results.next();
+        items.push(...results.items);
+    }
+
+    return items;
+}
+
+// Starts the request the first time it's asked for; everyone after that gets
+// the same promise. A failed request clears itself so the next open retries.
+function lessonsReady() {
+    if (!lessonsPromise) {
+        lessonsPromise = fetchAllLessons()
+            .then(indexLessons)
+            .catch(error => {
+                console.error('Could not load lessons:', error);
+                lessonsPromise = null;
+            });
+    }
+    return lessonsPromise;
+}
+
+function indexLessons(items) {
+    const grouped = new Map();
+
+    items.forEach(item => {
+        const key = Number(item[UNIT_FIELD]);
+        if (!grouped.has(key)) { grouped.set(key, []); }
+        grouped.get(key).push(item);
+    });
+
+    lessonsByUnit = grouped;
+    linkFieldName = LINK_FIELD || findLinkField(items[0]);
+    lessonsLoaded = true;
+
+    if (items.length > 0 && !linkFieldName) {
+        console.warn('No link-… field found on the lessons, so the lesson buttons have nowhere to go. Set LINK_FIELD.');
+    }
+}
+
+function findLinkField(item) {
+    return Object.keys(item || {}).find(key => key.startsWith('link-')) || '';
+}
+
+function tagsOf(lesson) {
+    const raw = lesson && lesson[TAGS_FIELD];
+    return (Array.isArray(raw) ? raw : [])
+        .filter(Boolean)
+        .map(tag => String(tag).trim());
+}
+
+// ============================================================
+// FILTER STATE
+// The dropdown and the search box are two halves of one filter, ANDed
+// together. Both write to the state below and then call applyFilters().
+// ============================================================
+let currentRoutine = ALL_ROUTINES;
+let currentSearch  = '';
+
+// Last-write-wins guard, shared by both controls, for the one thing that can
+// still be slow: waiting on the first load of lesson data.
+let filterToken = 0;
+
+function filterSignature() {
+    return currentRoutine + '|' + currentSearch;
+}
+
+function lessonMatches(lesson) {
+    const tags = tagsOf(lesson).map(tag => tag.toLowerCase());
+
+    if (currentRoutine !== ALL_ROUTINES && !tags.includes(currentRoutine.toLowerCase())) {
+        return false;
+    }
+
+    if (currentSearch) {
+        // Matches the lesson title, or any routine whose name contains the
+        // term — typing "warm" pulls in everything tagged "Warm Up".
+        const needle = currentSearch.toLowerCase();
+        const titleHit = String(lesson[TITLE_FIELD] || '').toLowerCase().includes(needle);
+        const routineHit = tags.some(tag => tag.includes(needle));
+        if (!titleHit && !routineHit) { return false; }
+    }
+
+    return true;
+}
+
+function lessonsForUnit(unit) {
+    return (lessonsByUnit.get(unit.unitValue) || []).filter(lessonMatches);
+}
+
+// Fills the unit's repeater for the current filters, unless it already
+// holds exactly that. Waits for the lesson data if it hasn't landed yet.
+function renderUnit(unit) {
+    return lessonsReady().then(() => {
+        if (!lessonsLoaded) { return; } // request failed — try again next open
+
+        const signature = filterSignature();
+        if (unit.renderedFor === signature) { return; }
+
+        unit.renderedFor = signature;
+        $w(unit.repeater).data = lessonsForUnit(unit);
+    });
+}
+
+// ============================================================
 // PAGE SETUP
 // ============================================================
 $w.onReady(function () {
@@ -139,7 +273,18 @@ $w.onReady(function () {
 
     setupSearch();
     setupRoutineFilter();
+
+    startLoadingLessons();
 });
+
+// Kicks off the one lessons request and fills any unit that starts open.
+// Everything above is already wired, so the page is usable while this runs.
+function startLoadingLessons() {
+    UNITS.forEach(unit => {
+        if (isUnitExpanded(unit)) { renderUnit(unit); }
+    });
+    return lessonsReady();
+}
 
 // ============================================================
 // HEADER BUTTONS (hover + click)
@@ -161,34 +306,44 @@ function setupHeaderButtons() {
 }
 
 // ============================================================
-// LESSON ROW STYLING
-// Not a one-shot pass. setFilter() makes a repeater re-render, and Wix
-// recycles row elements — the box that was black with white text can be
-// handed a different lesson next time. onItemReady fires again on every
-// re-render, so styling from there keeps rows correct after a search or a
-// routine change, provided every branch below sets an explicit state
+// LESSON ROWS
+// With no dataset behind the repeaters, nothing fills a row automatically —
+// onItemReady does all of it: the number, title and routines text, the
+// button's link and accessible name, and the routine colors.
+//
+// It fires again every time a repeater re-renders, and Wix recycles row
+// elements — the box that was black with white text can be handed a
+// different lesson next time. So every branch below sets an explicit state
 // rather than leaving the previous one in place.
 // ============================================================
 function setupLessonRows() {
     UNITS.forEach(unit => {
-        const styleRow = ($item, itemData) => styleLessonRow($item, itemData, unit);
+        // Registered before any data is assigned, so no row is ever missed.
+        $w(unit.repeater).onItemReady(($item, itemData) => fillLessonRow($item, itemData, unit));
 
-        $w(unit.repeater).onItemReady(styleRow);
-
-        // Rows that rendered before this ran. Safe to double up here in a way
-        // the side-nav wiring isn't — this only writes styles, it doesn't
-        // attach handlers, so running twice just paints the same colors.
-        if ($w(unit.repeater).data && $w(unit.repeater).data.length > 0) {
-            $w(unit.repeater).forEachItem(styleRow);
-        }
+        // A repeater with no dataset starts with placeholder rows. Empty it;
+        // renderUnit() fills it when the unit is opened.
+        $w(unit.repeater).data = [];
     });
 }
 
-function styleLessonRow($item, itemData, unit) {
-    const raw = itemData && itemData[TAGS_FIELD];
-    const tags = (Array.isArray(raw) ? raw : [])
-        .filter(Boolean)
-        .map(tag => String(tag).trim().toLowerCase());
+function fillLessonRow($item, itemData, unit) {
+    const tags = tagsOf(itemData);
+    const title = itemData[TITLE_FIELD] == null ? '' : String(itemData[TITLE_FIELD]);
+    const number = itemData[NUMBER_FIELD] == null ? '' : String(itemData[NUMBER_FIELD]);
+
+    $item(unit.rowNumber).text = number;
+    $item(unit.rowTitle).text = title;
+    $item(unit.rowText).text = tags.join(ROUTINE_JOINER);
+
+    const button = $item(unit.rowButton);
+    const link = linkFieldName && itemData[linkFieldName];
+    if (link) { button.link = link; }
+    try {
+        button.accessibility.ariaLabel = title;
+    } catch (error) {
+        // Accessible name is a nicety — never let it take the row down.
+    }
 
     // hide() rather than collapse() — the row keeps its footprint so the
     // spacing down the unit doesn't shift. The text is inside the box, so
@@ -197,7 +352,9 @@ function styleLessonRow($item, itemData, unit) {
         return $item(unit.rowBox).hide();
     }
 
-    const style = tags.reduce((found, tag) => found || ROUTINE_STYLES[tag], null)
+    const style = tags
+        .map(tag => tag.toLowerCase())
+        .reduce((found, tag) => found || ROUTINE_STYLES[tag], null)
         || DEFAULT_ROW_STYLE;
 
     $item(unit.rowBox).style.backgroundColor = style.box;
@@ -293,24 +450,8 @@ function scrollToUnit(index) {
 }
 
 // ============================================================
-// FILTER STATE
-// The dropdown and the search box are two halves of one filter, ANDed
-// together. Both write to the state below and then call applyFilters(),
-// which is the only thing that touches datasets.
+// FILTER CONTROLS
 // ============================================================
-let currentRoutine = ALL_ROUTINES;
-let currentSearch  = '';
-
-// Which datasets currently carry a filter beyond their unit condition. Only
-// these need resetting when both controls go back to empty — untouched
-// datasets are already showing everything.
-const filteredDatasets = new Set();
-
-// Last-write-wins guard, shared by both controls. If someone types again or
-// changes the dropdown while a slower query is still in flight, the stale
-// result is dropped instead of stomping the newer selection.
-let filterToken = 0;
-
 function setupRoutineFilter() {
     $w(ROUTINE_DROPDOWN).onChange(() => {
         currentRoutine = $w(ROUTINE_DROPDOWN).value || ALL_ROUTINES;
@@ -332,9 +473,6 @@ function fillRoutineOptions() {
     $w(ROUTINE_DROPDOWN).value = ALL_ROUTINES;
 }
 
-// ============================================================
-// SEARCH BOX
-// ============================================================
 let searchTimer;
 
 function setupSearch() {
@@ -343,7 +481,7 @@ function setupSearch() {
 
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => {
-            // Typing and deleting back to the same term shouldn't re-query.
+            // Typing and deleting back to the same term shouldn't re-run.
             if (typed === currentSearch) { return; }
             currentSearch = typed;
             applyFilters();
@@ -351,108 +489,20 @@ function setupSearch() {
     });
 }
 
-// contains() can't do a partial match inside an array field, so the routine
-// half of the search is resolved here instead: find the routine names that
-// contain the term, then hasSome() those exact values. Practical upshot —
-// typing "warm" pulls in everything tagged "Warm Up", not just titles with
-// "warm" in them.
-function routinesMatching(term) {
-    const needle = term.toLowerCase();
-    return ALL_ROUTINE_NAMES.filter(routine => routine.toLowerCase().includes(needle));
-}
-
-// ============================================================
-// FILTER BUILDERS
-// setFilter() REPLACES a dataset's filter, Editor filter included — so the
-// unit condition has to be rebuilt here every time, alongside whatever the
-// two controls currently hold.
-// ============================================================
-function searchFilter() {
-    const titleHit = wixData.filter().contains(TITLE_FIELD, currentSearch);
-    const routineHits = routinesMatching(currentSearch);
-
-    return routineHits.length > 0
-        ? titleHit.or(wixData.filter().hasSome(TAGS_FIELD, routineHits))
-        : titleHit;
-}
-
-function unitFilter(unit) {
-    let filter = wixData.filter().eq(UNIT_FIELD, unit.unitValue);
-
-    if (currentRoutine !== ALL_ROUTINES) {
-        filter = filter.hasSome(TAGS_FIELD, [currentRoutine]);
-    }
-
-    // The search is an OR internally (title or routine), so it has to be
-    // built as its own filter and ANDed on — chaining .or() onto the filter
-    // above would OR the unit condition away too.
-    if (currentSearch) {
-        filter = filter.and(searchFilter());
-    }
-
-    return filter;
-}
-
-// Same conditions as unitFilter(), minus the unit — asked as a query so
-// distinct() can answer "which units survive this?" in one request.
-function matchQuery() {
-    let query = wixData.query(COLLECTION_ID);
-
-    if (currentRoutine !== ALL_ROUTINES) {
-        query = query.hasSome(TAGS_FIELD, [currentRoutine]);
-    }
-
-    if (currentSearch) {
-        const routineHits = routinesMatching(currentSearch);
-        let sub = wixData.query(COLLECTION_ID).contains(TITLE_FIELD, currentSearch);
-
-        if (routineHits.length > 0) {
-            sub = sub.or(wixData.query(COLLECTION_ID).hasSome(TAGS_FIELD, routineHits));
-        }
-
-        query = query.and(sub);
-    }
-
-    return query;
-}
-
 // ============================================================
 // APPLYING THE FILTERS
+// Runs against the lessons already in memory, so there are no queries and no
+// setFilter calls — just "which units still have a matching lesson?", then
+// open those and hide the rest.
 // ============================================================
 function applyFilters() {
     const token = ++filterToken;
     const noFilters = currentRoutine === ALL_ROUTINES && currentSearch === '';
-    return noFilters ? resetAllUnits(token) : filterUnits(token);
-}
 
-// One small query answers "which units survive?" — distinct() returns just
-// the unit values, not the records. Only the units that actually matched
-// then need a setFilter; the rest are hidden without a request.
-function filterUnits(token) {
-    return matchQuery()
-        .distinct(UNIT_FIELD)
-        .then(results => {
+    return lessonsReady()
+        .then(() => {
             if (token !== filterToken) { return; } // superseded by a newer pick
-
-            const matchedValues = new Set(results.items);
-            const matched = UNITS.map(unit => matchedValues.has(unit.unitValue));
-
-            setRowVisibility(matched);
-
-            return Promise.all(UNITS.map((unit, index) => {
-                if (!matched[index]) {
-                    // Close before hiding so the arrow isn't stuck at 180
-                    // degrees when the unit comes back.
-                    return setUnitExpanded(unit, false)
-                        .then(() => $w(unit.anchor).collapse());
-                }
-
-                filteredDatasets.add(index);
-
-                return $w(unit.dataset).setFilter(unitFilter(unit))
-                    .then(() => $w(unit.anchor).expand())
-                    .then(() => setUnitExpanded(unit, true));
-            }));
+            return noFilters ? resetAllUnits() : filterUnits();
         })
         .then(() => {
             if (token === filterToken) { refreshToggleAllLabel(); }
@@ -462,30 +512,34 @@ function filterUnits(token) {
         });
 }
 
-// Reached only when both controls are empty, so unitFilter() here rebuilds
-// the bare unit condition.
-function resetAllUnits(token) {
-    const pending = Array.from(filteredDatasets).map(index =>
-        $w(UNITS[index].dataset).setFilter(unitFilter(UNITS[index]))
-    );
-    filteredDatasets.clear();
+function filterUnits() {
+    const matched = UNITS.map(unit => lessonsForUnit(unit).length > 0);
 
+    setRowVisibility(matched);
+
+    return Promise.all(UNITS.map((unit, index) => {
+        if (!matched[index]) {
+            // Close before hiding so the arrow isn't stuck at 180
+            // degrees when the unit comes back.
+            return setUnitExpanded(unit, false)
+                .then(() => $w(unit.anchor).collapse());
+        }
+
+        // Opening a unit is what fills its repeater for the new filter.
+        return $w(unit.anchor).expand()
+            .then(() => setUnitExpanded(unit, true));
+    }));
+}
+
+// Reached only when both controls are empty. Every unit comes back on screen,
+// closed. Their repeaters aren't touched — a unit that was showing filtered
+// rows rebuilds itself the next time it's opened.
+function resetAllUnits() {
     setRowVisibility(UNITS.map(() => true));
 
-    return Promise.all(pending)
-        .then(() => {
-            if (token !== filterToken) { return; }
-            // Everything back on screen, everything closed.
-            return Promise.all(UNITS.map(unit =>
-                $w(unit.anchor).expand().then(() => setUnitExpanded(unit, false))
-            ));
-        })
-        .then(() => {
-            if (token === filterToken) { refreshToggleAllLabel(); }
-        })
-        .catch(error => {
-            console.error('Could not reset filters:', error);
-        });
+    return Promise.all(UNITS.map(unit =>
+        $w(unit.anchor).expand().then(() => setUnitExpanded(unit, false))
+    ));
 }
 
 // ============================================================
@@ -523,17 +577,22 @@ function isUnitVisible(unit) {
 // can never drift out of sync with each other. Every path that opens or
 // closes a unit — header button, repeater button, expand all, routine
 // filter, search — comes through here, so this is the one place the arrow
-// needs to be kept in step.
+// needs to be kept in step, and the one place a unit's lessons get loaded
+// into its repeater.
 function setUnitExpanded(unit, shouldExpand) {
     if (unit.rotation) {
         shouldExpand ? unit.rotation.play() : unit.rotation.reverse();
     }
 
-    return Promise.all(
-        unit.panels.map(selector =>
+    // Kicked off first so the rows are in place as the panel opens.
+    const rendering = shouldExpand ? renderUnit(unit) : Promise.resolve();
+
+    return Promise.all([
+        rendering,
+        ...unit.panels.map(selector =>
             shouldExpand ? $w(selector).expand() : $w(selector).collapse()
         )
-    );
+    ]);
 }
 
 function toggleUnit(index) {
