@@ -1,71 +1,27 @@
 $w.onReady(function () {
-  $w("#dynamicDataset").onReady(() => {
-    updateItemCounter();
-  });
+    // 1. Run the counter when the initial dataset loads
+    $w("#dynamicDataset").onReady(() => {
+        updateItemCounter();
+    });
 
-  $w("#selectionTags2").onChange(() => {
-    updateItemCounter();
-  });
-
-  $w("#repeater4").onItemReady(() => {
-    updateItemCounter();
-  });
+    // 2. Run the counter every time new items are rendered into the repeater
+    // This perfectly catches both "Load More" clicks and search filter updates
+    $w("#repeater4").onItemReady(() => {
+        updateItemCounter();
+    });
 });
 
-let updateToken = 0;
+function updateItemCounter() {
+    // Small delay ensures Wix finishes updating the dataset count after a filter
+    setTimeout(() => {
+        // Get the total items matching the current filter criteria
+        const totalItems = $w("#dynamicDataset").getTotalCount();
 
-async function updateItemCounter() {
-  const myToken = ++updateToken;
-  try {
-    const totalItems = await waitForStableCount();
+        // Get the number of items currently loaded into the repeater layout
+        const visibleItems = $w("#repeater4").data.length;
 
-    if (myToken !== updateToken) {
-      return;
-    }
-
-    const visibleItems = $w("#repeater4").data.length;
-
-    const text = `Showing ${visibleItems} of ${totalItems} games`;
-    $w("#text159").text = text;
-    $w("#text160").text = text;
-
-  } catch (err) {
-    console.error("updateItemCounter failed:", err);
-  }
-}
-
-function waitForStableCount(maxTries = 20, delayMs = 60) {
-  return new Promise((resolve) => {
-    let lastCount = null;
-    let stableHits = 0;
-
-    const check = (tries) => {
-      const current = $w("#dynamicDataset").getTotalCount();
-
-      // null/undefined = dataset still refreshing, never treat as stable
-      if (current === null || current === undefined) {
-        if (tries >= maxTries) {
-          resolve(lastCount ?? $w("#repeater4").data.length ?? 0);
-          return;
-        }
-        setTimeout(() => check(tries + 1), delayMs);
-        return;
-      }
-
-      if (current === lastCount) {
-        stableHits++;
-      } else {
-        stableHits = 0;
-        lastCount = current;
-      }
-
-      if (stableHits >= 2 || tries >= maxTries) {
-        resolve(current);
-      } else {
-        setTimeout(() => check(tries + 1), delayMs);
-      }
-    };
-
-    check(0);
-  });
+        // Update your UI text element
+        $w("#text159").text = `Showing ${visibleItems} of ${totalItems} games`;
+		$w("#text160").text = `Showing ${visibleItems} of ${totalItems} games`;
+    }, 100); 
 }
