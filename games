@@ -1,0 +1,71 @@
+$w.onReady(function () {
+  $w("#dynamicDataset").onReady(() => {
+    updateItemCounter();
+  });
+
+  $w("#selectionTags2").onChange(() => {
+    updateItemCounter();
+  });
+
+  $w("#repeater4").onItemReady(() => {
+    updateItemCounter();
+  });
+});
+
+let updateToken = 0;
+
+async function updateItemCounter() {
+  const myToken = ++updateToken;
+  try {
+    const totalItems = await waitForStableCount();
+
+    if (myToken !== updateToken) {
+      return;
+    }
+
+    const visibleItems = $w("#repeater4").data.length;
+
+    const text = `Showing ${visibleItems} of ${totalItems} games`;
+    $w("#text159").text = text;
+    $w("#text160").text = text;
+
+  } catch (err) {
+    console.error("updateItemCounter failed:", err);
+  }
+}
+
+function waitForStableCount(maxTries = 20, delayMs = 60) {
+  return new Promise((resolve) => {
+    let lastCount = null;
+    let stableHits = 0;
+
+    const check = (tries) => {
+      const current = $w("#dynamicDataset").getTotalCount();
+
+      // null/undefined = dataset still refreshing, never treat as stable
+      if (current === null || current === undefined) {
+        if (tries >= maxTries) {
+          resolve(lastCount ?? $w("#repeater4").data.length ?? 0);
+          return;
+        }
+        setTimeout(() => check(tries + 1), delayMs);
+        return;
+      }
+
+      if (current === lastCount) {
+        stableHits++;
+      } else {
+        stableHits = 0;
+        lastCount = current;
+      }
+
+      if (stableHits >= 2 || tries >= maxTries) {
+        resolve(current);
+      } else {
+        setTimeout(() => check(tries + 1), delayMs);
+      }
+    };
+
+    check(0);
+  });
+}
