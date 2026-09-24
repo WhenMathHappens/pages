@@ -1,0 +1,48 @@
+// Velo API Reference: https://www.wix.com/velo/reference/api-overview/introduction
+
+$w.onReady(function () {
+	$w("#button7").disable();
+    // 1. Run the counter when the initial dataset loads
+    $w("#dynamicDataset").onReady(() => {
+        updateItemCounter();
+    });
+
+    // 2. Run the counter every time new items are rendered into the repeater
+    // This perfectly catches both "Load More" clicks and search filter updates
+    $w("#repeater4").onItemReady(() => {
+        updateItemCounter();
+    });
+});
+
+function updateItemCounter() {
+    // Small delay ensures Wix finishes updating the dataset count after a filter
+    setTimeout(() => {
+        // Get the total items matching the current filter criteria
+        const totalItems = $w("#dynamicDataset").getTotalCount();
+
+        // Get the number of items currently loaded into the repeater layout
+        const visibleItems = $w("#repeater4").data.length;
+
+        // Update your UI text element
+        $w("#text159").text = `Showing ${visibleItems} out of ${totalItems} challenges`;
+		$w("#text160").text = `Showing ${visibleItems} out of ${totalItems} challenges`;
+    }, 100); 
+}
+
+$w('#button5').onClick((event) => {
+       $w("#box193").expand();
+	   $w("#button5").disable();
+})
+
+$w('#button6').onClick((event) => {
+       $w("#box197").expand(); 
+       $w("#imageX2").expand(); 
+	   $w("#button6").disable();
+	   $w("#button7").enable();
+})
+
+$w('#button7').onClick((event) => {
+       $w("#box199").expand(); 
+       $w("#googleMaps1").expand(); 
+	   $w("#button7").disable();
+})
