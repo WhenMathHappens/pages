@@ -1,0 +1,19 @@
+$w.onReady(function () {
+  $w("#dynamicDataset").onReady(() => {
+    const item = $w("#dynamicDataset").getCurrentItem();
+    const tags = item.tag; // field key for the "tag" column
+
+    // Works whether "tag" is a Tags field (array) or a plain text field
+    const hasDailyOverview = Array.isArray(tags)
+      ? tags.includes("Daily Overview")
+      : typeof tags === "string" && tags.includes("Daily Overview");
+
+    if (hasDailyOverview) {
+      $w("#box186").expand();
+      $w("#richContentViewer1").expand();
+    } else {
+      $w("#box186").collapse();
+      $w("#richContentViewer1").collapse();
+    }
+  });
+});
