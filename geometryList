@@ -1,7 +1,9 @@
+// Geometry (List) dynamic page code
 // Velo API Reference: https://www.wix.com/velo/reference/api-overview/introduction
 
-import wixWindow from 'wix-window-frontend';         // older sites: 'wix-window'
-import wixAnimations from 'wix-animations-frontend'; // older sites: 'wix-animations'
+import wixWindow from 'wix-window-frontend';             // older sites: 'wix-window'
+import wixAnimations from 'wix-animations-frontend';     // older sites: 'wix-animations'
+import wixLocationFrontend from 'wix-location-frontend'; // older sites: 'wix-location'
 import wixData from 'wix-data';
 
 // ============================================================
@@ -21,8 +23,8 @@ const NUMBER_FIELD = 'lessonNumber';
 // the sort the old datasets used — change it if they sorted by something else.
 const SORT_FIELD = NUMBER_FIELD;
 
-// The field holding each lesson's link to the "Algebra 1 (item)" page. Query
-// results carry it as link-<collection>-<field>, e.g. link-GeometryCurriculum-title.
+// The field holding each lesson's link to the "Geometry (item)" page. Query
+// results carry it as link-<collection>-<field>, e.g. link-geometry-title.
 // Leave blank and it's found automatically; fill it in only if the page has
 // more than one dynamic page and the wrong link gets picked.
 const LINK_FIELD = 'link-geometry-title';
@@ -278,6 +280,7 @@ $w.onReady(function () {
     setupRoutineFilter();
 
     startLoadingLessons();
+    openUnitFromUrl();
 });
 
 // Kicks off the one lessons request and fills any unit that starts open.
@@ -287,6 +290,25 @@ function startLoadingLessons() {
         if (isUnitExpanded(unit)) { renderUnit(unit); }
     });
     return lessonsReady();
+}
+
+// ============================================================
+// ARRIVING FROM A LESSON
+// The item page's #text89 links here as /geometry?unit=N. Open that unit,
+// highlight it in the side nav, and scroll to it. No unit (or one that
+// doesn't match) leaves the page as it normally loads.
+// ============================================================
+function openUnitFromUrl() {
+    const requested = Number(wixLocationFrontend.query.unit);
+    const index = UNITS.findIndex(unit => unit.unitValue === requested);
+    if (index === -1) { return; }
+
+    selectRepeaterItem(index);
+    // Same order as the side nav: expand first (which waits for the unit's
+    // rows), so the anchor is in its final place before we scroll.
+    expandUnit(index)
+        .then(() => scrollToUnit(index))
+        .catch(error => console.error('Could not open unit from URL:', error));
 }
 
 // ============================================================
@@ -579,9 +601,9 @@ function isUnitVisible(unit) {
 // Sets an explicit state instead of toggling, so the panels inside a unit
 // can never drift out of sync with each other. Every path that opens or
 // closes a unit — header button, repeater button, expand all, routine
-// filter, search — comes through here, so this is the one place the arrow
-// needs to be kept in step, and the one place a unit's lessons get loaded
-// into its repeater.
+// filter, search, arriving from a lesson — comes through here, so this is
+// the one place the arrow needs to be kept in step, and the one place a
+// unit's lessons get loaded into its repeater.
 function setUnitExpanded(unit, shouldExpand) {
     if (unit.rotation) {
         shouldExpand ? unit.rotation.play() : unit.rotation.reverse();
