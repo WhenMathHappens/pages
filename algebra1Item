@@ -1,0 +1,42 @@
+// Algebra 1 (Item) dynamic page code
+// Velo API Reference: https://www.wix.com/velo/reference/api-overview/introduction
+
+import wixLocationFrontend from 'wix-location-frontend'; // older sites: 'wix-location'
+
+// The Algebra 1 list page (https://www.whenmathhappens.com/algebra-1).
+const LIST_PAGE_PATH = '/algebra-1';
+
+// Field keys (same collection the list page uses).
+const UNIT_FIELD = 'unit';
+const TAGS_FIELD = 'arraystring';
+
+$w.onReady(function () {
+    $w('#dynamicDataset').onReady(() => {
+        const item = $w('#dynamicDataset').getCurrentItem();
+
+        // ---- Hide the routines box when the item has no routines ----
+        // A blank tags cell can come back as undefined, null, [] or [''],
+        // so all of those count as blank.
+        const routines = item[TAGS_FIELD];
+        const hasRoutines = Array.isArray(routines)
+            ? routines.some(r => String(r).trim() !== '')
+            : Boolean(routines && String(routines).trim());
+
+        if (hasRoutines) {
+            $w('#box151').expand();
+        } else {
+            $w('#box151').collapse();
+        }
+
+        // ---- Link back to this lesson's unit on the list page ----
+        // The list page reads ?unit=N, then opens and scrolls to that unit.
+        const unit = Number(item[UNIT_FIELD]);
+
+        $w('#text89').onClick(() => {
+            const url = Number.isFinite(unit) && unit > 0
+                ? `${LIST_PAGE_PATH}?unit=${unit}`
+                : LIST_PAGE_PATH;
+            wixLocationFrontend.to(url);
+        });
+    });
+});
