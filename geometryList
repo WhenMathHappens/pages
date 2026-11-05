@@ -46,6 +46,7 @@ const ALL_ROUTINE_NAMES = [
     'Concept Quiz',
     'Constructions',
     'Error Analysis',
+    'Focus Day',
     'Free Chance',
     'Game',
     'No Lesson Yet',
