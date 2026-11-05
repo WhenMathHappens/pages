@@ -43,6 +43,7 @@ const ALL_ROUTINE_NAMES = [
     'Chromebooks',
     'Concept Quiz',
     'Error Analysis',
+    'Focus Day',
     'Free Chance',
     'Game',
     'Partner A & B',
